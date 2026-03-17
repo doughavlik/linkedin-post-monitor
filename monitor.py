@@ -165,10 +165,14 @@ def detect_activity_type(update):
 # Company batch checker
 # ---------------------------------------------------------------------------
 
-def _parse_feed_response(data, fallback_url_prefix):
+def _parse_feed_response(data, fallback_url_prefix, allowed_types=None):
     """
     Extract the most recent activity from a Voyager feed API response.
     Returns dict with keys: activity_text, activity_time, activity_url, activity_type.
+
+    allowed_types: optional set of activity type strings (e.g. {'post','article'}).
+    When provided, candidates are scanned in order and the first whose detected
+    type is in the set is used; if none match, returns None.
     """
     ref_time = datetime.now()
     included = data.get('included', [])
@@ -190,7 +194,15 @@ def _parse_feed_response(data, fallback_url_prefix):
     if not candidates:
         return None
 
-    latest = candidates[0]
+    if allowed_types:
+        latest = next(
+            (c for c in candidates if detect_activity_type(c) in allowed_types),
+            None,
+        )
+        if latest is None:
+            return None
+    else:
+        latest = candidates[0]
 
     # Extract relative time text
     activity_text = None
@@ -262,6 +274,7 @@ def check_company_batch(slugs, session):
             parsed = _parse_feed_response(
                 resp.json(),
                 fallback_url_prefix=f"https://www.linkedin.com/company/{slug}/posts/",
+                allowed_types={'post', 'article'},
             )
 
             if parsed is None:
