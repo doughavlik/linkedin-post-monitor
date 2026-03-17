@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LinkedIn Post Monitor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    body { background: #f0f2f5; font-size: 0.9rem; }
+    .navbar { background: #0a66c2 !important; }
+    .navbar-brand { font-weight: 700; letter-spacing: 0.3px; }
+    .status-bar { background: #fff; border-bottom: 1px solid #dee2e6; padding: 6px 16px; font-size: 0.82rem; color: #555; }
+
+    /* Cards */
+    .table-container { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+    /* Tables */
+    .table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6c757d; border-top: none; white-space: nowrap; }
+    .table td { vertical-align: middle; }
+    .table tbody tr:hover { background: #f8f9fa; }
+
+    /* Activity type badges */
+    .badge-post     { background:#dbeafe; color:#1e40af; }
+    .badge-share    { background:#d1fae5; color:#065f46; }
+    .badge-article  { background:#fef3c7; color:#92400e; }
+    .badge-comment  { background:#ede9fe; color:#5b21b6; }
+    .badge-reaction { background:#fce7f3; color:#9d174d; }
+    .atype-badge    { display:inline-block; padding:1px 7px; border-radius:99px; font-size:0.75rem; font-weight:600; }
+
+    /* Recency highlight on datetime */
+    .time-new    { color:#065f46; font-weight:600; }
+    .time-recent { color:#1e40af; }
+    .time-old    { color:#6b7280; }
+
+    /* Inline editing */
+    tr.editing td { background: #fffbe6; }
+    .edit-input { font-size: 0.88rem; padding: 2px 6px; height: 28px; }
+    .btn-icon { padding: 2px 6px; font-size: 0.8rem; }
+
+    /* Add row */
+    #add-row td, #add-person-row td { background: #f0f9ff; }
+
+    /* Settings */
+    .settings-card { max-width: 640px; }
+    .settings-hint { font-size: 0.78rem; color: #6c757d; margin-top: 3px; }
+
+    /* Toast */
+    .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
+
+    /* Sortable headers */
+    .sort-th { cursor: pointer; user-select: none; }
+    .sort-th:hover { color: #343a40; background: #e2e6ea; }
+    .sort-icon { font-size: 0.65rem; margin-left: 3px; opacity: 0.35; vertical-align: middle; }
+    .sort-th.sort-active { color: #0a66c2; }
+    .sort-th.sort-active .sort-icon { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark navbar-expand-lg">
+  <div class="container-fluid px-3">
+    <span class="navbar-brand"><i class="bi bi-linkedin me-1"></i>LinkedIn Monitor</span>
+    <div class="ms-auto">
+      <button id="btn-run-now" class="btn btn-sm btn-light fw-semibold" onclick="runNow()">
+        <i class="bi bi-play-fill me-1"></i>Run Now
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- Status bar -->
+<div class="status-bar d-flex gap-4 align-items-center flex-wrap">
+  <span><i class="bi bi-clock me-1"></i>Last run: <strong id="status-last-run">—</strong></span>
+  <span><i class="bi bi-arrow-repeat me-1"></i>Next run: <strong id="status-next-run">—</strong></span>
+  <span id="status-scheduler" class="ms-auto"></span>
+</div>
+
+<!-- Main -->
+<div class="container-fluid px-3 py-3">
+
+  <ul class="nav nav-tabs mb-3" id="mainTabs">
+    <li class="nav-item">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-companies">
+        <i class="bi bi-building me-1"></i>Companies
+        <span class="badge bg-secondary ms-1" id="company-count"></span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-people">
+        <i class="bi bi-person-lines-fill me-1"></i>People
+        <span class="badge bg-secondary ms-1" id="people-count"></span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-runs">
+        <i class="bi bi-list-check me-1"></i>Run History
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-settings">
+        <i class="bi bi-gear me-1"></i>Settings
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    <!-- ===== Companies Tab ===== -->
+    <div class="tab-pane fade show active" id="tab-companies">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <input id="co-search" type="search" class="form-control form-control-sm" style="max-width:240px"
+               placeholder="Search name or slug…" oninput="renderCompanies()">
+        <div class="form-check form-switch ms-2 mb-0">
+          <input class="form-check-input" type="checkbox" id="co-show-inactive" onchange="renderCompanies()">
+          <label class="form-check-label" for="co-show-inactive">Show inactive</label>
+        </div>
+        <button class="btn btn-sm btn-primary ms-auto" onclick="showAddCompanyRow()">
+          <i class="bi bi-plus-lg me-1"></i>Add Company
+        </button>
+      </div>
+
+      <div class="table-container">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="companies-table">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3 sort-th" id="co-th-name"        style="width:180px" onclick="sortCo('name')">Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="co-th-slug"         style="width:200px" onclick="sortCo('slug')">Slug <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th style="width:80px;text-align:center">Active</th>
+                <th class="sort-th"      id="co-th-last_activity_type" style="width:110px" onclick="sortCo('last_activity_type')">Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="co-th-last_post_time"     style="width:160px" onclick="sortCo('last_post_time')">Latest Activity <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th style="width:60px;text-align:center">Link</th>
+                <th class="sort-th"      id="co-th-last_checked"       style="width:140px" onclick="sortCo('last_checked')">Last Checked <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="pe-3" style="width:100px;text-align:right"></th>
+              </tr>
+            </thead>
+            <tbody id="companies-tbody">
+              <tr><td colspan="8" class="text-center py-4 text-muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== People Tab ===== -->
+    <div class="tab-pane fade" id="tab-people">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <input id="ppl-search" type="search" class="form-control form-control-sm" style="max-width:240px"
+               placeholder="Search name or company…" oninput="renderPeople()">
+        <div class="form-check form-switch ms-2 mb-0">
+          <input class="form-check-input" type="checkbox" id="ppl-show-inactive" onchange="renderPeople()">
+          <label class="form-check-label" for="ppl-show-inactive">Show inactive</label>
+        </div>
+        <button class="btn btn-sm btn-primary ms-auto" onclick="showAddPersonRow()">
+          <i class="bi bi-plus-lg me-1"></i>Add Person
+        </button>
+      </div>
+
+      <div class="table-container">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3 sort-th" id="ppl-th-name"              style="width:180px" onclick="sortPpl('name')">Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="ppl-th-profile_url"        style="width:260px" onclick="sortPpl('profile_url')">Profile URL <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="ppl-th-company_name"       style="width:160px" onclick="sortPpl('company_name')">Company <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th style="width:80px;text-align:center">Active</th>
+                <th class="sort-th"      id="ppl-th-last_activity_type" style="width:110px" onclick="sortPpl('last_activity_type')">Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="ppl-th-last_activity_time" style="width:160px" onclick="sortPpl('last_activity_time')">Latest Activity <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th style="width:60px;text-align:center">Link</th>
+                <th class="sort-th"      id="ppl-th-last_checked"       style="width:140px" onclick="sortPpl('last_checked')">Last Checked <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="pe-3" style="width:100px;text-align:right"></th>
+              </tr>
+            </thead>
+            <tbody id="people-tbody">
+              <tr><td colspan="9" class="text-center py-4 text-muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Run History Tab ===== -->
+    <div class="tab-pane fade" id="tab-runs">
+      <div class="table-container">
+        <div class="d-flex align-items-center px-3 pt-3 pb-2">
+          <h6 class="mb-0">Recent Monitor Runs</h6>
+          <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="loadRuns()">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Run Time</th>
+                <th class="text-center">Co. Checked</th>
+                <th class="text-center">Co. New</th>
+                <th class="text-center">Ppl. Checked</th>
+                <th class="text-center">Ppl. New</th>
+                <th class="text-center">Email</th>
+                <th>Status</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="runs-tbody">
+              <tr><td colspan="8" class="text-center py-4 text-muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Settings Tab ===== -->
+    <div class="tab-pane fade" id="tab-settings">
+      <div class="settings-card">
+
+        <div class="table-container p-4 mb-3">
+          <h6 class="mb-3"><i class="bi bi-linkedin me-1 text-primary"></i>LinkedIn Session Cookies</h6>
+          <p class="text-muted" style="font-size:0.82rem">
+            Log into LinkedIn in your browser, open DevTools (<kbd>F12</kbd>) →
+            Application → Cookies → <code>linkedin.com</code>, then copy the values below.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">li_at cookie</label>
+            <input type="password" class="form-control" id="s-li-at"
+                   placeholder="Paste li_at value…" autocomplete="off">
+            <div class="settings-hint" id="li-at-hint"></div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">JSESSIONID cookie</label>
+            <input type="password" class="form-control" id="s-jsessionid"
+                   placeholder="Paste JSESSIONID value…" autocomplete="off">
+            <div class="settings-hint" id="jsessionid-hint"></div>
+          </div>
+        </div>
+
+        <div class="table-container p-4 mb-3">
+          <h6 class="mb-3"><i class="bi bi-envelope me-1 text-primary"></i>Email (SMTP)</h6>
+          <div class="row g-3">
+            <div class="col-8">
+              <label class="form-label fw-semibold">SMTP Host</label>
+              <input type="text" class="form-control" id="s-smtp-host" placeholder="smtp.gmail.com">
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-semibold">Port</label>
+              <input type="number" class="form-control" id="s-smtp-port" placeholder="587">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Gmail address</label>
+              <input type="email" class="form-control" id="s-smtp-user" placeholder="you@gmail.com">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">App Password</label>
+              <input type="password" class="form-control" id="s-smtp-password"
+                     placeholder="Leave blank to keep existing…" autocomplete="new-password">
+              <div class="settings-hint">
+                Generate at: myaccount.google.com → Security → 2-Step Verification → App passwords
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Send reports to</label>
+              <input type="email" class="form-control" id="s-email-to" placeholder="recipient@example.com">
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container p-4 mb-3">
+          <h6 class="mb-3"><i class="bi bi-clock me-1 text-primary"></i>Schedule</h6>
+          <div style="max-width:180px">
+            <label class="form-label fw-semibold">Check interval (minutes)</label>
+            <input type="number" class="form-control" id="s-interval" min="5" max="1440" placeholder="30">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="saveSettings()">
+          <i class="bi bi-check-lg me-1"></i>Save Settings
+        </button>
+      </div>
+    </div>
+
+  </div><!-- tab-content -->
+</div>
+
+<!-- Toast -->
+<div class="toast-container">
+  <div id="app-toast" class="toast align-items-center border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toast-body"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ============================================================
+// State
+// ============================================================
+let companies = [];
+let people = [];
+let coEditingId = null;
+let pplEditingId = null;
+let coAddRowVisible = false;
+let pplAddRowVisible = false;
+
+// Sort state — default: both tables sort by name ascending
+let coSortCol  = 'name', coSortDir  = 'asc';
+let pplSortCol = 'name', pplSortDir = 'asc';
+
+// ============================================================
+// Toast
+// ============================================================
+function toast(msg, type = 'success') {
+  const el = document.getElementById('app-toast');
+  const body = document.getElementById('toast-body');
+  body.textContent = msg;
+  el.className = `toast align-items-center border-0 text-bg-${type === 'error' ? 'danger' : 'success'}`;
+  bootstrap.Toast.getOrCreateInstance(el, { delay: 3500 }).show();
+}
+
+// ============================================================
+// Status bar
+// ============================================================
+async function loadStatus() {
+  try {
+    const d = await fetch('/api/monitor/status').then(r => r.json());
+    const lr = d.last_run;
+    document.getElementById('status-last-run').textContent = lr
+      ? `${lr.run_time}  (co:${lr.new_posts_count} ppl:${lr.new_people_activity_count || 0})`
+      : 'Never';
+    document.getElementById('status-next-run').textContent = d.next_run || '—';
+    document.getElementById('status-scheduler').innerHTML = d.scheduler_running
+      ? `<span class="badge bg-success">Scheduler running · every ${d.interval_minutes} min</span>`
+      : `<span class="badge bg-warning text-dark">Scheduler stopped</span>`;
+  } catch (e) { /* ignore */ }
+}
+
+// ============================================================
+// Activity type badge
+// ============================================================
+const ATYPE_CLASS = {
+  post: 'badge-post', share: 'badge-share', article: 'badge-article',
+  comment: 'badge-comment', reaction: 'badge-reaction',
+};
+const ATYPE_LABEL = {
+  post: 'Post', share: 'Share', article: 'Article',
+  comment: 'Comment', reaction: 'Reaction',
+};
+
+function atypeBadge(type) {
+  if (!type) return '<span class="text-muted">—</span>';
+  const cls = ATYPE_CLASS[type] || 'badge-post';
+  const lbl = ATYPE_LABEL[type] || type;
+  return `<span class="atype-badge ${cls}">${lbl}</span>`;
+}
+
+// ============================================================
+// Datetime display
+// ============================================================
+function fmtDateTime(str) {
+  // str like "2026-03-17 09:30"
+  if (!str) return '<span class="text-muted">—</span>';
+  try {
+    const d = new Date(str.replace(' ', 'T'));
+    const opts = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
+    return d.toLocaleString('en-US', opts);
+  } catch (e) {
+    return str;
+  }
+}
+
+function timeClass(str) {
+  if (!str) return 'time-old';
+  try {
+    const diff = (Date.now() - new Date(str.replace(' ', 'T')).getTime()) / 60000; // minutes
+    if (diff <= 35) return 'time-new';
+    if (diff <= 120) return 'time-recent';
+  } catch (e) { /* */ }
+  return 'time-old';
+}
+
+function timeCell(str) {
+  if (!str) return '<span class="text-muted">—</span>';
+  const cls = timeClass(str);
+  return `<span class="${cls}">${fmtDateTime(str)}</span>`;
+}
+
+// ============================================================
+// Sorting helpers
+// ============================================================
+function sortRows(arr, col, dir) {
+  return [...arr].sort((a, b) => {
+    const va = a[col] ?? '';
+    const vb = b[col] ?? '';
+    // Empty values always sink to the bottom regardless of direction
+    const aEmpty = va === '' || va === null || va === undefined;
+    const bEmpty = vb === '' || vb === null || vb === undefined;
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+    const sa = String(va).toLowerCase();
+    const sb = String(vb).toLowerCase();
+    if (sa < sb) return dir === 'asc' ? -1 : 1;
+    if (sa > sb) return dir === 'asc' ?  1 : -1;
+    return 0;
+  });
+}
+
+// CO_COLS / PPL_COLS: all sortable column keys for each table
+const CO_COLS  = ['name', 'slug', 'last_activity_type', 'last_post_time', 'last_checked'];
+const PPL_COLS = ['name', 'profile_url', 'company_name', 'last_activity_type', 'last_activity_time', 'last_checked'];
+
+function updateSortHeaders(prefix, activeCols, col, dir) {
+  activeCols.forEach(c => {
+    const th = document.getElementById(`${prefix}-th-${c}`);
+    if (!th) return;
+    const icon = th.querySelector('.sort-icon');
+    if (c === col) {
+      th.classList.add('sort-active');
+      icon.className = `bi bi-arrow-${dir === 'asc' ? 'up' : 'down'} sort-icon`;
+    } else {
+      th.classList.remove('sort-active');
+      icon.className = 'bi bi-arrow-down-up sort-icon';
+    }
+  });
+}
+
+function sortCo(col) {
+  coSortDir = (coSortCol === col && coSortDir === 'asc') ? 'desc' : 'asc';
+  coSortCol = col;
+  renderCompanies();
+}
+
+function sortPpl(col) {
+  pplSortDir = (pplSortCol === col && pplSortDir === 'asc') ? 'desc' : 'asc';
+  pplSortCol = col;
+  renderPeople();
+}
+
+// ============================================================
+// Companies
+// ============================================================
+async function loadCompanies() {
+  try {
+    companies = await fetch('/api/companies').then(r => r.json());
+    renderCompanies();
+    document.getElementById('company-count').textContent = companies.length;
+  } catch (e) {
+    document.getElementById('companies-tbody').innerHTML =
+      `<tr><td colspan="8" class="text-danger text-center py-3">Failed to load.</td></tr>`;
+  }
+}
+
+function renderCompanies() {
+  const q = document.getElementById('co-search').value.toLowerCase();
+  const showInactive = document.getElementById('co-show-inactive').checked;
+  let filtered = companies.filter(c => {
+    if (!showInactive && !c.active) return false;
+    if (q && !c.name.toLowerCase().includes(q) && !c.slug.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  filtered = sortRows(filtered, coSortCol, coSortDir);
+  updateSortHeaders('co', CO_COLS, coSortCol, coSortDir);
+
+  let rows = filtered.length
+    ? filtered.map(c => buildCompanyRow(c)).join('')
+    : `<tr><td colspan="8" class="text-center text-muted py-3">No companies match.</td></tr>`;
+
+  if (coAddRowVisible) rows += buildAddCompanyRow();
+  document.getElementById('companies-tbody').innerHTML = rows;
+}
+
+function buildCompanyRow(c) {
+  if (coEditingId === c.id) return buildCompanyEditRow(c);
+  const dim = c.active ? '' : 'text-muted';
+  const activeIcon = c.active
+    ? `<i class="bi bi-check-circle-fill text-success"></i>`
+    : `<i class="bi bi-x-circle-fill text-secondary"></i>`;
+  const postLink = c.last_post_url
+    ? `<a href="${escHtml(c.last_post_url)}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>`
+    : `<span class="text-muted">—</span>`;
+  const checked = c.last_checked ? c.last_checked.substring(0, 16) : '—';
+
+  return `
+  <tr class="${dim}">
+    <td class="ps-3">${escHtml(c.name)}</td>
+    <td><code style="font-size:.82rem">${escHtml(c.slug)}</code></td>
+    <td class="text-center">${activeIcon}</td>
+    <td>${atypeBadge(c.last_activity_type)}</td>
+    <td>${timeCell(c.last_post_time)}</td>
+    <td class="text-center">${postLink}</td>
+    <td style="font-size:.8rem">${checked}</td>
+    <td class="text-end pe-3">
+      <button class="btn btn-sm btn-outline-primary btn-icon" onclick="startCoEdit(${c.id})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger btn-icon ms-1" onclick="deleteCompany(${c.id})"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`;
+}
+
+function buildCompanyEditRow(c) {
+  return `
+  <tr class="editing">
+    <td class="ps-3"><input class="form-control edit-input" id="co-edit-name" value="${escHtml(c.name)}"></td>
+    <td><input class="form-control edit-input" id="co-edit-slug" value="${escHtml(c.slug)}"></td>
+    <td class="text-center">
+      <input type="checkbox" class="form-check-input" id="co-edit-active" ${c.active ? 'checked' : ''}>
+    </td>
+    <td colspan="4" class="text-muted" style="font-size:.8rem">${c.last_post_time || '—'}</td>
+    <td class="text-end pe-3">
+      <button class="btn btn-sm btn-success btn-icon" onclick="saveCoEdit(${c.id})"><i class="bi bi-check-lg"></i></button>
+      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="cancelCoEdit()"><i class="bi bi-x-lg"></i></button>
+    </td>
+  </tr>`;
+}
+
+function buildAddCompanyRow() {
+  return `
+  <tr id="add-row">
+    <td class="ps-3"><input class="form-control" id="add-co-name" placeholder="Company name" style="font-size:.88rem;height:30px"></td>
+    <td><input class="form-control" id="add-co-slug" placeholder="linkedin-slug" style="font-size:.88rem;height:30px"></td>
+    <td colspan="5"></td>
+    <td class="text-end pe-3">
+      <button class="btn btn-sm btn-success btn-icon" onclick="submitAddCompany()"><i class="bi bi-plus-lg"></i></button>
+      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="hideAddCompanyRow()"><i class="bi bi-x-lg"></i></button>
+    </td>
+  </tr>`;
+}
+
+function startCoEdit(id) { coEditingId = id; renderCompanies(); setTimeout(() => document.getElementById('co-edit-name')?.focus(), 50); }
+function cancelCoEdit() { coEditingId = null; renderCompanies(); }
+
+async function saveCoEdit(id) {
+  const name = document.getElementById('co-edit-name').value.trim();
+  const slug = document.getElementById('co-edit-slug').value.trim();
+  const active = document.getElementById('co-edit-active').checked ? 1 : 0;
+  if (!name || !slug) { toast('Name and slug required.', 'error'); return; }
+  try {
+    const d = await fetch(`/api/companies/${id}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, slug, active}),
+    }).then(r => r.json());
+    if (d.error) { toast(d.error, 'error'); return; }
+    coEditingId = null;
+    await loadCompanies();
+    toast('Saved.');
+  } catch (e) { toast('Save failed.', 'error'); }
+}
+
+async function deleteCompany(id) {
+  const c = companies.find(x => x.id === id);
+  if (!confirm(`Delete "${c ? c.name : id}"?`)) return;
+  await fetch(`/api/companies/${id}`, {method: 'DELETE'});
+  await loadCompanies();
+  toast('Deleted.');
+}
+
+function showAddCompanyRow() { coAddRowVisible = true; coEditingId = null; renderCompanies(); setTimeout(() => document.getElementById('add-co-name')?.focus(), 50); }
+function hideAddCompanyRow() { coAddRowVisible = false; renderCompanies(); }
+
+async function submitAddCompany() {
+  const name = document.getElementById('add-co-name').value.trim();
+  const slug = document.getElementById('add-co-slug').value.trim();
+  if (!name || !slug) { toast('Name and slug required.', 'error'); return; }
+  try {
+    const d = await fetch('/api/companies', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, slug}),
+    }).then(r => r.json());
+    if (d.error) { toast(d.error, 'error'); return; }
+    coAddRowVisible = false;
+    await loadCompanies();
+    toast('Company added.');
+  } catch (e) { toast('Add failed.', 'error'); }
+}
+
+// ============================================================
+// People
+// ============================================================
+async function loadPeople() {
+  try {
+    people = await fetch('/api/people').then(r => r.json());
+    renderPeople();
+    document.getElementById('people-count').textContent = people.length;
+  } catch (e) {
+    document.getElementById('people-tbody').innerHTML =
+      `<tr><td colspan="9" class="text-danger text-center py-3">Failed to load.</td></tr>`;
+  }
+}
+
+function renderPeople() {
+  const q = document.getElementById('ppl-search').value.toLowerCase();
+  const showInactive = document.getElementById('ppl-show-inactive').checked;
+  let filtered = people.filter(p => {
+    if (!showInactive && !p.active) return false;
+    if (q && !p.name.toLowerCase().includes(q) && !(p.company_name || '').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  filtered = sortRows(filtered, pplSortCol, pplSortDir);
+  updateSortHeaders('ppl', PPL_COLS, pplSortCol, pplSortDir);
+
+  let rows = filtered.length
+    ? filtered.map(p => buildPersonRow(p)).join('')
+    : `<tr><td colspan="9" class="text-center text-muted py-3">No people tracked yet. Click "Add Person" to start.</td></tr>`;
+
+  if (pplAddRowVisible) rows += buildAddPersonRow();
+  document.getElementById('people-tbody').innerHTML = rows;
+}
+
+function buildPersonRow(p) {
+  if (pplEditingId === p.id) return buildPersonEditRow(p);
+  const dim = p.active ? '' : 'text-muted';
+  const activeIcon = p.active
+    ? `<i class="bi bi-check-circle-fill text-success"></i>`
+    : `<i class="bi bi-x-circle-fill text-secondary"></i>`;
+  const actLink = p.last_activity_url
+    ? `<a href="${escHtml(p.last_activity_url)}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>`
+    : `<span class="text-muted">—</span>`;
+  const checked = p.last_checked ? p.last_checked.substring(0, 16) : '—';
+  const coName = p.company_name || '<span class="text-muted">—</span>';
+  const profileShort = p.profile_url.replace('https://www.linkedin.com', '');
+
+  return `
+  <tr class="${dim}">
+    <td class="ps-3">${escHtml(p.name)}</td>
+    <td><a href="${escHtml(p.profile_url)}" target="_blank" class="text-decoration-none" style="font-size:.82rem"><code>${escHtml(profileShort)}</code></a></td>
+    <td style="font-size:.83rem">${escHtml(p.company_name || '')||'<span class="text-muted">—</span>'}</td>
+    <td class="text-center">${activeIcon}</td>
+    <td>${atypeBadge(p.last_activity_type)}</td>
+    <td>${timeCell(p.last_activity_time)}</td>
+    <td class="text-center">${actLink}</td>
+    <td style="font-size:.8rem">${checked}</td>
+    <td class="text-end pe-3">
+      <button class="btn btn-sm btn-outline-primary btn-icon" onclick="startPplEdit(${p.id})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger btn-icon ms-1" onclick="deletePerson(${p.id})"><i class="bi bi-trash"></i></button>
+    </td>
+  </tr>`;
+}
+
+function buildPersonEditRow(p) {
+  const companyOptions = companies.map(c =>
+    `<option value="${c.id}" ${p.company_id === c.id ? 'selected' : ''}>${escHtml(c.name)}</option>`
+  ).join('');
+  return `
+  <tr class="editing">
+    <td class="ps-3"><input class="form-control edit-input" id="ppl-edit-name" value="${escHtml(p.name)}"></td>
+    <td><input class="form-control edit-input" id="ppl-edit-url" value="${escHtml(p.profile_url)}" style="width:220px"></td>
+    <td>
+      <select class="form-select edit-input" id="ppl-edit-company" style="font-size:.82rem">
+        <option value="">— None —</option>
+        ${companyOptions}
+      </select>
+    </td>
+    <td class="text-center">
+      <input type="checkbox" class="form-check-input" id="ppl-edit-active" ${p.active ? 'checked' : ''}>
+    </td>
+    <td colspan="4" class="text-muted" style="font-size:.8rem">${p.last_activity_time || '—'}</td>
+    <td class="text-end pe-3">
+      <button class="btn btn-sm btn-success btn-icon" onclick="savePplEdit(${p.id})"><i class="bi bi-check-lg"></i></button>
+      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="cancelPplEdit()"><i class="bi bi-x-lg"></i></button>
+    </td>
+  </tr>`;
+}
+
+function buildAddPersonRow() {
+  const companyOptions = companies.map(c =>
+    `<option value="${c.id}">${escHtml(c.name)}</option>`
+  ).join('');
+  return `
+  <tr id="add-person-row">
+    <td class="ps-3"><input class="form-control" id="add-ppl-name" placeholder="Full name" style="font-size:.88rem;height:30px"></td>
+    <td><input class="form-control" id="add-ppl-url" placeholder="https://linkedin.com/in/..." style="font-size:.82rem;height:30px;width:240px"></td>
+    <td>
+      <select class="form-select" id="add-ppl-company" style="font-size:.82rem;height:30px;padding:2px 6px">
+        <option value="">— No company —</option>
+        ${companyOptions}
+      </select>
+    </td>
+    <td colspan="4"></td>
+    <td></td>
+    <td class="text-end pe-3">
+      <button class="btn btn-sm btn-success btn-icon" onclick="submitAddPerson()"><i class="bi bi-plus-lg"></i></button>
+      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="hideAddPersonRow()"><i class="bi bi-x-lg"></i></button>
+    </td>
+  </tr>`;
+}
+
+function startPplEdit(id) { pplEditingId = id; renderPeople(); setTimeout(() => document.getElementById('ppl-edit-name')?.focus(), 50); }
+function cancelPplEdit() { pplEditingId = null; renderPeople(); }
+
+async function savePplEdit(id) {
+  const name = document.getElementById('ppl-edit-name').value.trim();
+  const profile_url = document.getElementById('ppl-edit-url').value.trim();
+  const company_id = document.getElementById('ppl-edit-company').value || null;
+  const active = document.getElementById('ppl-edit-active').checked ? 1 : 0;
+  if (!name || !profile_url) { toast('Name and profile URL required.', 'error'); return; }
+  try {
+    const d = await fetch(`/api/people/${id}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, profile_url, company_id, active}),
+    }).then(r => r.json());
+    if (d.error) { toast(d.error, 'error'); return; }
+    pplEditingId = null;
+    await loadPeople();
+    toast('Saved.');
+  } catch (e) { toast('Save failed.', 'error'); }
+}
+
+async function deletePerson(id) {
+  const p = people.find(x => x.id === id);
+  if (!confirm(`Delete "${p ? p.name : id}"?`)) return;
+  await fetch(`/api/people/${id}`, {method: 'DELETE'});
+  await loadPeople();
+  toast('Deleted.');
+}
+
+function showAddPersonRow() {
+  pplAddRowVisible = true; pplEditingId = null;
+  renderPeople();
+  setTimeout(() => document.getElementById('add-ppl-name')?.focus(), 50);
+}
+function hideAddPersonRow() { pplAddRowVisible = false; renderPeople(); }
+
+async function submitAddPerson() {
+  const name = document.getElementById('add-ppl-name').value.trim();
+  const profile_url = document.getElementById('add-ppl-url').value.trim();
+  const company_id = document.getElementById('add-ppl-company').value || null;
+  if (!name || !profile_url) { toast('Name and profile URL required.', 'error'); return; }
+  try {
+    const d = await fetch('/api/people', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, profile_url, company_id}),
+    }).then(r => r.json());
+    if (d.error) { toast(d.error, 'error'); return; }
+    pplAddRowVisible = false;
+    await loadPeople();
+    toast('Person added.');
+  } catch (e) { toast('Add failed.', 'error'); }
+}
+
+// ============================================================
+// Run Now
+// ============================================================
+async function runNow() {
+  const btn = document.getElementById('btn-run-now');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+  try {
+    const d = await fetch('/api/monitor/run', {method: 'POST'}).then(r => r.json());
+    if (d.error) {
+      toast(`⚠️ ${d.error}`, 'error');
+    } else {
+      const cNew = (d.new_company_activity || []).length;
+      const pNew = (d.new_people_activity || []).length;
+      toast(`✓ Co: ${cNew} new · Ppl: ${pNew} new · email: ${d.email_sent ? 'sent' : 'not sent'}`);
+    }
+    await Promise.all([loadCompanies(), loadPeople(), loadStatus(), loadRuns()]);
+  } catch (e) {
+    toast('Run failed.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Now';
+  }
+}
+
+// ============================================================
+// Run History
+// ============================================================
+async function loadRuns() {
+  try {
+    const runs = await fetch('/api/monitor/runs').then(r => r.json());
+    const tbody = document.getElementById('runs-tbody');
+    if (!runs.length) {
+      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-3">No runs yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = runs.map(run => {
+      const stIcon = run.status === 'ok'
+        ? `<i class="bi bi-check-circle-fill text-success"></i>`
+        : `<i class="bi bi-exclamation-circle-fill text-danger"></i>`;
+      const emailBadge = run.email_sent
+        ? `<span class="badge bg-success-subtle text-success-emphasis">yes</span>`
+        : `<span class="badge bg-secondary-subtle text-secondary-emphasis">no</span>`;
+      return `
+        <tr>
+          <td style="font-size:.82rem">${run.run_time}</td>
+          <td class="text-center">${run.companies_checked}</td>
+          <td class="text-center">${run.new_posts_count > 0 ? `<span class="badge bg-primary">${run.new_posts_count}</span>` : '<span class="text-muted">0</span>'}</td>
+          <td class="text-center">${run.people_checked || 0}</td>
+          <td class="text-center">${(run.new_people_activity_count || 0) > 0 ? `<span class="badge bg-primary">${run.new_people_activity_count}</span>` : '<span class="text-muted">0</span>'}</td>
+          <td class="text-center">${emailBadge}</td>
+          <td>${stIcon}</td>
+          <td style="font-size:.78rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(run.notes||'')}">${escHtml(run.notes||'')}</td>
+        </tr>`;
+    }).join('');
+  } catch (e) { /* ignore */ }
+}
+
+// ============================================================
+// Settings
+// ============================================================
+async function loadSettings() {
+  try {
+    const s = await fetch('/api/settings').then(r => r.json());
+    document.getElementById('s-smtp-host').value = s.smtp_host || 'smtp.gmail.com';
+    document.getElementById('s-smtp-port').value = s.smtp_port || '587';
+    document.getElementById('s-smtp-user').value = s.smtp_user || '';
+    document.getElementById('s-email-to').value = s.email_to || '';
+    document.getElementById('s-interval').value = s.monitor_interval_minutes || '30';
+    document.getElementById('li-at-hint').textContent =
+      s.linkedin_li_at === '__set__' ? '✓ Cookie is set. Leave blank to keep existing.' : 'Not set yet.';
+    document.getElementById('jsessionid-hint').textContent =
+      s.linkedin_jsessionid === '__set__' ? '✓ Cookie is set. Leave blank to keep existing.' : 'Not set yet.';
+  } catch (e) { /* ignore */ }
+}
+
+async function saveSettings() {
+  const payload = {
+    smtp_host: document.getElementById('s-smtp-host').value.trim(),
+    smtp_port: document.getElementById('s-smtp-port').value.trim(),
+    smtp_user: document.getElementById('s-smtp-user').value.trim(),
+    email_to: document.getElementById('s-email-to').value.trim(),
+    monitor_interval_minutes: document.getElementById('s-interval').value.trim(),
+  };
+  const liAt = document.getElementById('s-li-at').value.trim();
+  const jses = document.getElementById('s-jsessionid').value.trim();
+  const pw = document.getElementById('s-smtp-password').value.trim();
+  if (liAt) payload.linkedin_li_at = liAt;
+  if (jses) payload.linkedin_jsessionid = jses;
+  if (pw) payload.smtp_app_password = pw;
+  try {
+    const d = await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    }).then(r => r.json());
+    if (d.error) { toast(d.error, 'error'); return; }
+    document.getElementById('s-li-at').value = '';
+    document.getElementById('s-jsessionid').value = '';
+    document.getElementById('s-smtp-password').value = '';
+    await loadSettings();
+    await loadStatus();
+    toast('Settings saved.');
+  } catch (e) { toast('Save failed.', 'error'); }
+}
+
+// ============================================================
+// Utility
+// ============================================================
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// Tab hooks
+// ============================================================
+document.querySelectorAll('[data-bs-toggle="tab"]').forEach(btn => {
+  btn.addEventListener('shown.bs.tab', e => {
+    const t = e.target.getAttribute('data-bs-target');
+    if (t === '#tab-runs') loadRuns();
+    if (t === '#tab-settings') loadSettings();
+    if (t === '#tab-people') loadPeople();
+  });
+});
+
+// Escape key closes edit/add rows
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (coEditingId !== null) cancelCoEdit();
+    if (coAddRowVisible) hideAddCompanyRow();
+    if (pplEditingId !== null) cancelPplEdit();
+    if (pplAddRowVisible) hideAddPersonRow();
+  }
+});
+
+// ============================================================
+// Init
+// ============================================================
+(async () => {
+  await Promise.all([loadCompanies(), loadPeople(), loadStatus()]);
+  setInterval(loadStatus, 60_000);
+})();
+</script>
+</body>
+</html>

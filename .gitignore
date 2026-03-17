@@ -1,0 +1,17 @@
+# Database (contains your data — do not commit)
+linkedin_monitor.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
