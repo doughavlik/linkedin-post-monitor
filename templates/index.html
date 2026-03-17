@@ -479,7 +479,7 @@ async function loadCompanies() {
   try {
     companies = await fetch('/api/companies').then(r => r.json());
     renderCompanies();
-    document.getElementById('company-count').textContent = companies.length;
+    document.getElementById('company-count').textContent = companies.filter(c => c.active).length;
   } catch (e) {
     document.getElementById('companies-tbody').innerHTML =
       `<tr><td colspan="9" class="text-danger text-center py-3">Failed to load.</td></tr>`;
@@ -633,7 +633,7 @@ async function loadPeople() {
   try {
     people = await fetch('/api/people').then(r => r.json());
     renderPeople();
-    document.getElementById('people-count').textContent = people.length;
+    document.getElementById('people-count').textContent = people.filter(p => p.active).length;
   } catch (e) {
     document.getElementById('people-tbody').innerHTML =
       `<tr><td colspan="10" class="text-danger text-center py-3">Failed to load.</td></tr>`;
