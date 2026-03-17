@@ -63,7 +63,8 @@ def get_linkedin_session():
 def parse_timestamp(text):
     """
     Parse LinkedIn relative time string → (value: int, unit: str) or None.
-    Units: 'm' minutes, 'h' hours, 'd' days, 'w' weeks.
+    Units: 'm' minutes, 'h' hours, 'd' days, 'w' weeks, 'mo' months, 'y' years.
+    'mo' must be matched before 'm' so "1mo" isn't read as 1 minute.
     """
     if not text:
         return None
@@ -72,9 +73,13 @@ def parse_timestamp(text):
     if 'just now' in text or text == '0m':
         return (0, 'm')
 
-    match = re.search(r'(\d+)\s*([mhdw])', text)
+    match = re.search(r'(\d+)\s*(mo|yr?|[mhdw])', text)
     if match:
-        return (int(match.group(1)), match.group(2))
+        value = int(match.group(1))
+        unit = match.group(2)
+        if unit.startswith('y'):
+            unit = 'y'
+        return (value, unit)
 
     return None
 
@@ -82,6 +87,7 @@ def parse_timestamp(text):
 def relative_to_datetime(text, ref_time=None):
     """
     Convert a LinkedIn relative timestamp like '5h •' to an absolute datetime string.
+    Subtracts the post age from the current (or provided) time.
     Returns 'YYYY-MM-DD HH:MM' (approximate) or None if unparseable.
     """
     parsed = parse_timestamp(text)
@@ -92,8 +98,14 @@ def relative_to_datetime(text, ref_time=None):
         ref_time = datetime.now()
 
     value, unit = parsed
-    delta_map = {'m': timedelta(minutes=value), 'h': timedelta(hours=value),
-                 'd': timedelta(days=value), 'w': timedelta(weeks=value)}
+    delta_map = {
+        'm':  timedelta(minutes=value),
+        'h':  timedelta(hours=value),
+        'd':  timedelta(days=value),
+        'w':  timedelta(weeks=value),
+        'mo': timedelta(days=30 * value),
+        'y':  timedelta(days=365 * value),
+    }
     delta = delta_map.get(unit)
     if delta is None:
         return None
@@ -154,6 +166,19 @@ def detect_activity_type(update):
     try:
         update_type = update.get('updateMetadata', {}).get('updateType', '')
         if 'COMMENT' in update_type.upper():
+            return 'comment'
+    except Exception:
+        pass
+
+    # LinkedIn's header text is the most reliable signal — it's explicitly
+    # generated for display ("X reacted to this", "X shared Y's post", etc.)
+    try:
+        header = update.get('header', {}).get('text', {}).get('text', '').lower()
+        if any(w in header for w in ('reacted', 'likes this', 'loves this', 'celebrates', 'supports')):
+            return 'reaction'
+        if any(w in header for w in ('shared', 'reshared')):
+            return 'share'
+        if 'commented' in header:
             return 'comment'
     except Exception:
         pass
@@ -274,7 +299,6 @@ def check_company_batch(slugs, session):
             parsed = _parse_feed_response(
                 resp.json(),
                 fallback_url_prefix=f"https://www.linkedin.com/company/{slug}/posts/",
-                allowed_types={'post', 'article'},
             )
 
             if parsed is None:
