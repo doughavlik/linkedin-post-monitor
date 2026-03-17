@@ -58,7 +58,7 @@ def init_db():
     ''')
 
     # Migrations for databases created before these columns were added
-    for col_def in ['last_post_time TEXT', 'last_activity_type TEXT']:
+    for col_def in ['last_post_time TEXT', 'last_activity_type TEXT', 'notes TEXT']:
         try:
             c.execute(f"ALTER TABLE companies ADD COLUMN {col_def}")
         except Exception:
@@ -77,10 +77,17 @@ def init_db():
             last_activity_url TEXT,
             last_activity_type TEXT,
             last_checked TEXT,
+            notes TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
         )
     ''')
+
+    for col_def in ['notes TEXT']:
+        try:
+            c.execute(f"ALTER TABLE people ADD COLUMN {col_def}")
+        except Exception:
+            pass
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS monitor_runs (
@@ -161,12 +168,26 @@ def add_company(name, slug):
     conn.close()
 
 
-def update_company(id, name, slug, active):
+def get_company_by_slug(slug):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM companies WHERE slug=?", (slug,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_company(id, name, slug, active, notes=''):
     conn = get_conn()
     conn.execute(
-        "UPDATE companies SET name=?, slug=?, active=? WHERE id=?",
-        (name, slug, active, id)
+        "UPDATE companies SET name=?, slug=?, active=?, notes=? WHERE id=?",
+        (name, slug, active, notes or None, id)
     )
+    conn.commit()
+    conn.close()
+
+
+def toggle_company_active(id):
+    conn = get_conn()
+    conn.execute("UPDATE companies SET active = 1 - active WHERE id=?", (id,))
     conn.commit()
     conn.close()
 
@@ -231,13 +252,27 @@ def add_person(name, profile_slug, profile_url, company_id=None):
     conn.close()
 
 
-def update_person(id, name, profile_slug, profile_url, company_id, active):
+def get_person_by_slug(slug):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM people WHERE profile_slug=?", (slug,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_person(id, name, profile_slug, profile_url, company_id, active, notes=''):
     conn = get_conn()
     conn.execute(
         "UPDATE people SET name=?, profile_slug=?, profile_url=?, "
-        "company_id=?, active=? WHERE id=?",
-        (name, profile_slug, profile_url, company_id or None, active, id)
+        "company_id=?, active=?, notes=? WHERE id=?",
+        (name, profile_slug, profile_url, company_id or None, active, notes or None, id)
     )
+    conn.commit()
+    conn.close()
+
+
+def toggle_person_active(id):
+    conn = get_conn()
+    conn.execute("UPDATE people SET active = 1 - active WHERE id=?", (id,))
     conn.commit()
     conn.close()
 

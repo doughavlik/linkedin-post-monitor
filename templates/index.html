@@ -20,6 +20,13 @@
     .table td { vertical-align: middle; }
     .table tbody tr:hover { background: #f8f9fa; }
 
+    /* Sortable headers */
+    .sort-th { cursor: pointer; user-select: none; }
+    .sort-th:hover { color: #343a40; background: #e2e6ea; }
+    .sort-icon { font-size: 0.65rem; margin-left: 3px; opacity: 0.35; vertical-align: middle; }
+    .sort-th.sort-active { color: #0a66c2; }
+    .sort-th.sort-active .sort-icon { opacity: 1; }
+
     /* Activity type badges */
     .badge-post     { background:#dbeafe; color:#1e40af; }
     .badge-share    { background:#d1fae5; color:#065f46; }
@@ -32,6 +39,19 @@
     .time-new    { color:#065f46; font-weight:600; }
     .time-recent { color:#1e40af; }
     .time-old    { color:#6b7280; }
+
+    /* Notes preview */
+    .notes-preview { cursor:pointer; font-size:.8rem; color:#374151; white-space:nowrap;
+                     overflow:hidden; text-overflow:ellipsis; display:block; max-width:72px; }
+    .notes-preview:hover { color:#0a66c2; text-decoration:underline; }
+
+    /* Notes modal body: rendered markdown */
+    #notes-modal-body h1,
+    #notes-modal-body h2,
+    #notes-modal-body h3 { font-size:1rem; margin-top:.5rem; }
+    #notes-modal-body p  { margin-bottom:.4rem; }
+    #notes-modal-body ul,
+    #notes-modal-body ol { padding-left:1.2rem; }
 
     /* Inline editing */
     tr.editing td { background: #fffbe6; }
@@ -47,13 +67,6 @@
 
     /* Toast */
     .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
-
-    /* Sortable headers */
-    .sort-th { cursor: pointer; user-select: none; }
-    .sort-th:hover { color: #343a40; background: #e2e6ea; }
-    .sort-icon { font-size: 0.65rem; margin-left: 3px; opacity: 0.35; vertical-align: middle; }
-    .sort-th.sort-active { color: #0a66c2; }
-    .sort-th.sort-active .sort-icon { opacity: 1; }
   </style>
 </head>
 <body>
@@ -114,7 +127,7 @@
                placeholder="Search name or slug…" oninput="renderCompanies()">
         <div class="form-check form-switch ms-2 mb-0">
           <input class="form-check-input" type="checkbox" id="co-show-inactive" onchange="renderCompanies()">
-          <label class="form-check-label" for="co-show-inactive">Show inactive</label>
+          <label class="form-check-label" for="co-show-inactive">Show archived</label>
         </div>
         <button class="btn btn-sm btn-primary ms-auto" onclick="showAddCompanyRow()">
           <i class="bi bi-plus-lg me-1"></i>Add Company
@@ -126,18 +139,19 @@
           <table class="table table-hover mb-0" id="companies-table">
             <thead class="table-light">
               <tr>
-                <th class="ps-3 sort-th" id="co-th-name"        style="width:180px" onclick="sortCo('name')">Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th class="sort-th"      id="co-th-slug"         style="width:200px" onclick="sortCo('slug')">Slug <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th style="width:80px;text-align:center">Active</th>
-                <th class="sort-th"      id="co-th-last_activity_type" style="width:110px" onclick="sortCo('last_activity_type')">Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th class="sort-th"      id="co-th-last_post_time"     style="width:160px" onclick="sortCo('last_post_time')">Latest Activity <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th style="width:60px;text-align:center">Link</th>
-                <th class="sort-th"      id="co-th-last_checked"       style="width:140px" onclick="sortCo('last_checked')">Last Checked <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th class="pe-3" style="width:100px;text-align:right"></th>
+                <th class="ps-3 sort-th" id="co-th-name"              style="width:170px"  onclick="sortCo('name')">Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="co-th-slug"               style="width:190px"  onclick="sortCo('slug')">Slug <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th style="width:70px;text-align:center">Active</th>
+                <th class="sort-th"      id="co-th-last_activity_type" style="width:100px"  onclick="sortCo('last_activity_type')">Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="co-th-last_post_time"     style="width:150px"  onclick="sortCo('last_post_time')">Latest Activity <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th style="width:50px;text-align:center">Link</th>
+                <th class="sort-th"      id="co-th-last_checked"       style="width:130px"  onclick="sortCo('last_checked')">Last Checked <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="co-th-notes"              style="width:80px"   onclick="sortCo('notes')">Notes <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="pe-3" style="width:120px;text-align:right"></th>
               </tr>
             </thead>
             <tbody id="companies-tbody">
-              <tr><td colspan="8" class="text-center py-4 text-muted">Loading…</td></tr>
+              <tr><td colspan="9" class="text-center py-4 text-muted">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -151,7 +165,7 @@
                placeholder="Search name or company…" oninput="renderPeople()">
         <div class="form-check form-switch ms-2 mb-0">
           <input class="form-check-input" type="checkbox" id="ppl-show-inactive" onchange="renderPeople()">
-          <label class="form-check-label" for="ppl-show-inactive">Show inactive</label>
+          <label class="form-check-label" for="ppl-show-inactive">Show archived</label>
         </div>
         <button class="btn btn-sm btn-primary ms-auto" onclick="showAddPersonRow()">
           <i class="bi bi-plus-lg me-1"></i>Add Person
@@ -163,19 +177,20 @@
           <table class="table table-hover mb-0">
             <thead class="table-light">
               <tr>
-                <th class="ps-3 sort-th" id="ppl-th-name"              style="width:180px" onclick="sortPpl('name')">Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th class="sort-th"      id="ppl-th-profile_url"        style="width:260px" onclick="sortPpl('profile_url')">Profile URL <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th class="sort-th"      id="ppl-th-company_name"       style="width:160px" onclick="sortPpl('company_name')">Company <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th style="width:80px;text-align:center">Active</th>
-                <th class="sort-th"      id="ppl-th-last_activity_type" style="width:110px" onclick="sortPpl('last_activity_type')">Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th class="sort-th"      id="ppl-th-last_activity_time" style="width:160px" onclick="sortPpl('last_activity_time')">Latest Activity <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th style="width:60px;text-align:center">Link</th>
-                <th class="sort-th"      id="ppl-th-last_checked"       style="width:140px" onclick="sortPpl('last_checked')">Last Checked <i class="bi bi-arrow-down-up sort-icon"></i></th>
-                <th class="pe-3" style="width:100px;text-align:right"></th>
+                <th class="ps-3 sort-th" id="ppl-th-name"              style="width:160px"  onclick="sortPpl('name')">Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="ppl-th-profile_url"        style="width:230px"  onclick="sortPpl('profile_url')">Profile URL <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="ppl-th-company_name"       style="width:140px"  onclick="sortPpl('company_name')">Company <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th style="width:70px;text-align:center">Active</th>
+                <th class="sort-th"      id="ppl-th-last_activity_type" style="width:100px"  onclick="sortPpl('last_activity_type')">Type <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="ppl-th-last_activity_time" style="width:150px"  onclick="sortPpl('last_activity_time')">Latest Activity <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th style="width:50px;text-align:center">Link</th>
+                <th class="sort-th"      id="ppl-th-last_checked"       style="width:130px"  onclick="sortPpl('last_checked')">Last Checked <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="sort-th"      id="ppl-th-notes"              style="width:80px"   onclick="sortPpl('notes')">Notes <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                <th class="pe-3" style="width:120px;text-align:right"></th>
               </tr>
             </thead>
             <tbody id="people-tbody">
-              <tr><td colspan="9" class="text-center py-4 text-muted">Loading…</td></tr>
+              <tr><td colspan="10" class="text-center py-4 text-muted">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -284,6 +299,19 @@
   </div><!-- tab-content -->
 </div>
 
+<!-- Notes view modal -->
+<div class="modal fade" id="notes-modal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2 px-3">
+        <h6 class="modal-title mb-0"><i class="bi bi-journal-text me-1"></i>Notes</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body px-3 py-2" id="notes-modal-body" style="font-size:.88rem;max-height:60vh;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast-container">
   <div id="app-toast" class="toast align-items-center border-0" role="alert">
@@ -295,6 +323,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
 <script>
 // ============================================================
 // State
@@ -306,7 +335,7 @@ let pplEditingId = null;
 let coAddRowVisible = false;
 let pplAddRowVisible = false;
 
-// Sort state — default: both tables sort by name ascending
+// Sort state
 let coSortCol  = 'name', coSortDir  = 'asc';
 let pplSortCol = 'name', pplSortDir = 'asc';
 
@@ -339,63 +368,12 @@ async function loadStatus() {
 }
 
 // ============================================================
-// Activity type badge
-// ============================================================
-const ATYPE_CLASS = {
-  post: 'badge-post', share: 'badge-share', article: 'badge-article',
-  comment: 'badge-comment', reaction: 'badge-reaction',
-};
-const ATYPE_LABEL = {
-  post: 'Post', share: 'Share', article: 'Article',
-  comment: 'Comment', reaction: 'Reaction',
-};
-
-function atypeBadge(type) {
-  if (!type) return '<span class="text-muted">—</span>';
-  const cls = ATYPE_CLASS[type] || 'badge-post';
-  const lbl = ATYPE_LABEL[type] || type;
-  return `<span class="atype-badge ${cls}">${lbl}</span>`;
-}
-
-// ============================================================
-// Datetime display
-// ============================================================
-function fmtDateTime(str) {
-  // str like "2026-03-17 09:30"
-  if (!str) return '<span class="text-muted">—</span>';
-  try {
-    const d = new Date(str.replace(' ', 'T'));
-    const opts = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
-    return d.toLocaleString('en-US', opts);
-  } catch (e) {
-    return str;
-  }
-}
-
-function timeClass(str) {
-  if (!str) return 'time-old';
-  try {
-    const diff = (Date.now() - new Date(str.replace(' ', 'T')).getTime()) / 60000; // minutes
-    if (diff <= 35) return 'time-new';
-    if (diff <= 120) return 'time-recent';
-  } catch (e) { /* */ }
-  return 'time-old';
-}
-
-function timeCell(str) {
-  if (!str) return '<span class="text-muted">—</span>';
-  const cls = timeClass(str);
-  return `<span class="${cls}">${fmtDateTime(str)}</span>`;
-}
-
-// ============================================================
 // Sorting helpers
 // ============================================================
 function sortRows(arr, col, dir) {
   return [...arr].sort((a, b) => {
     const va = a[col] ?? '';
     const vb = b[col] ?? '';
-    // Empty values always sink to the bottom regardless of direction
     const aEmpty = va === '' || va === null || va === undefined;
     const bEmpty = vb === '' || vb === null || vb === undefined;
     if (aEmpty && bEmpty) return 0;
@@ -409,9 +387,8 @@ function sortRows(arr, col, dir) {
   });
 }
 
-// CO_COLS / PPL_COLS: all sortable column keys for each table
-const CO_COLS  = ['name', 'slug', 'last_activity_type', 'last_post_time', 'last_checked'];
-const PPL_COLS = ['name', 'profile_url', 'company_name', 'last_activity_type', 'last_activity_time', 'last_checked'];
+const CO_COLS  = ['name', 'slug', 'last_activity_type', 'last_post_time', 'last_checked', 'notes'];
+const PPL_COLS = ['name', 'profile_url', 'company_name', 'last_activity_type', 'last_activity_time', 'last_checked', 'notes'];
 
 function updateSortHeaders(prefix, activeCols, col, dir) {
   activeCols.forEach(c => {
@@ -441,6 +418,61 @@ function sortPpl(col) {
 }
 
 // ============================================================
+// Activity type badge / datetime / notes helpers
+// ============================================================
+const ATYPE_CLASS = {
+  post: 'badge-post', share: 'badge-share', article: 'badge-article',
+  comment: 'badge-comment', reaction: 'badge-reaction',
+};
+const ATYPE_LABEL = {
+  post: 'Post', share: 'Share', article: 'Article',
+  comment: 'Comment', reaction: 'Reaction',
+};
+
+function atypeBadge(type) {
+  if (!type) return '<span class="text-muted">—</span>';
+  const cls = ATYPE_CLASS[type] || 'badge-post';
+  return `<span class="atype-badge ${cls}">${ATYPE_LABEL[type] || type}</span>`;
+}
+
+function fmtDateTime(str) {
+  if (!str) return '<span class="text-muted">—</span>';
+  try {
+    const d = new Date(str.replace(' ', 'T'));
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  } catch (e) { return str; }
+}
+
+function timeClass(str) {
+  if (!str) return 'time-old';
+  try {
+    const diff = (Date.now() - new Date(str.replace(' ', 'T')).getTime()) / 60000;
+    if (diff <= 35) return 'time-new';
+    if (diff <= 120) return 'time-recent';
+  } catch (e) { /* */ }
+  return 'time-old';
+}
+
+function timeCell(str) {
+  if (!str) return '<span class="text-muted">—</span>';
+  return `<span class="${timeClass(str)}">${fmtDateTime(str)}</span>`;
+}
+
+function notesCell(notes) {
+  if (!notes) return '<span class="text-muted" style="font-size:.78rem">—</span>';
+  const preview = notes.length > 5 ? notes.substring(0, 5) + '…' : notes;
+  // encode notes into a data attribute to avoid quote-escaping issues in onclick
+  const escaped = escHtml(notes);
+  return `<span class="notes-preview" data-notes="${escaped}" onclick="showNotes(this)" title="Click to view">${escHtml(preview)}</span>`;
+}
+
+function showNotes(el) {
+  const raw = el.getAttribute('data-notes');
+  document.getElementById('notes-modal-body').innerHTML = marked.parse(raw || '');
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('notes-modal')).show();
+}
+
+// ============================================================
 // Companies
 // ============================================================
 async function loadCompanies() {
@@ -450,7 +482,7 @@ async function loadCompanies() {
     document.getElementById('company-count').textContent = companies.length;
   } catch (e) {
     document.getElementById('companies-tbody').innerHTML =
-      `<tr><td colspan="8" class="text-danger text-center py-3">Failed to load.</td></tr>`;
+      `<tr><td colspan="9" class="text-danger text-center py-3">Failed to load.</td></tr>`;
   }
 }
 
@@ -468,7 +500,7 @@ function renderCompanies() {
 
   let rows = filtered.length
     ? filtered.map(c => buildCompanyRow(c)).join('')
-    : `<tr><td colspan="8" class="text-center text-muted py-3">No companies match.</td></tr>`;
+    : `<tr><td colspan="9" class="text-center text-muted py-3">No companies match.</td></tr>`;
 
   if (coAddRowVisible) rows += buildAddCompanyRow();
   document.getElementById('companies-tbody').innerHTML = rows;
@@ -479,11 +511,14 @@ function buildCompanyRow(c) {
   const dim = c.active ? '' : 'text-muted';
   const activeIcon = c.active
     ? `<i class="bi bi-check-circle-fill text-success"></i>`
-    : `<i class="bi bi-x-circle-fill text-secondary"></i>`;
+    : `<i class="bi bi-archive-fill text-secondary" title="Archived"></i>`;
   const postLink = c.last_post_url
     ? `<a href="${escHtml(c.last_post_url)}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>`
     : `<span class="text-muted">—</span>`;
   const checked = c.last_checked ? c.last_checked.substring(0, 16) : '—';
+  const archiveBtn = c.active
+    ? `<button class="btn btn-sm btn-outline-secondary btn-icon ms-1" onclick="archiveCompany(${c.id})" title="Archive"><i class="bi bi-archive"></i></button>`
+    : `<button class="btn btn-sm btn-outline-success btn-icon ms-1" onclick="archiveCompany(${c.id})" title="Unarchive"><i class="bi bi-arrow-counterclockwise"></i></button>`;
 
   return `
   <tr class="${dim}">
@@ -494,9 +529,11 @@ function buildCompanyRow(c) {
     <td>${timeCell(c.last_post_time)}</td>
     <td class="text-center">${postLink}</td>
     <td style="font-size:.8rem">${checked}</td>
+    <td>${notesCell(c.notes)}</td>
     <td class="text-end pe-3">
-      <button class="btn btn-sm btn-outline-primary btn-icon" onclick="startCoEdit(${c.id})"><i class="bi bi-pencil"></i></button>
-      <button class="btn btn-sm btn-outline-danger btn-icon ms-1" onclick="deleteCompany(${c.id})"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-sm btn-outline-primary btn-icon" onclick="startCoEdit(${c.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+      ${archiveBtn}
+      <button class="btn btn-sm btn-outline-danger btn-icon ms-1" onclick="deleteCompany(${c.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`;
 }
@@ -510,9 +547,12 @@ function buildCompanyEditRow(c) {
       <input type="checkbox" class="form-check-input" id="co-edit-active" ${c.active ? 'checked' : ''}>
     </td>
     <td colspan="4" class="text-muted" style="font-size:.8rem">${c.last_post_time || '—'}</td>
+    <td><textarea class="form-control" id="co-edit-notes" rows="2"
+          style="font-size:.8rem;min-width:140px;resize:vertical"
+          placeholder="Markdown…">${escHtml(c.notes || '')}</textarea></td>
     <td class="text-end pe-3">
-      <button class="btn btn-sm btn-success btn-icon" onclick="saveCoEdit(${c.id})"><i class="bi bi-check-lg"></i></button>
-      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="cancelCoEdit()"><i class="bi bi-x-lg"></i></button>
+      <button class="btn btn-sm btn-success btn-icon" onclick="saveCoEdit(${c.id})" title="Save"><i class="bi bi-check-lg"></i></button>
+      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="cancelCoEdit()" title="Cancel"><i class="bi bi-x-lg"></i></button>
     </td>
   </tr>`;
 }
@@ -523,9 +563,11 @@ function buildAddCompanyRow() {
     <td class="ps-3"><input class="form-control" id="add-co-name" placeholder="Company name" style="font-size:.88rem;height:30px"></td>
     <td><input class="form-control" id="add-co-slug" placeholder="linkedin-slug" style="font-size:.88rem;height:30px"></td>
     <td colspan="5"></td>
+    <td><textarea class="form-control" id="add-co-notes" rows="2"
+          style="font-size:.8rem;min-width:120px;resize:vertical" placeholder="Notes (markdown)…"></textarea></td>
     <td class="text-end pe-3">
-      <button class="btn btn-sm btn-success btn-icon" onclick="submitAddCompany()"><i class="bi bi-plus-lg"></i></button>
-      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="hideAddCompanyRow()"><i class="bi bi-x-lg"></i></button>
+      <button class="btn btn-sm btn-success btn-icon" onclick="submitAddCompany()" title="Add"><i class="bi bi-plus-lg"></i></button>
+      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="hideAddCompanyRow()" title="Cancel"><i class="bi bi-x-lg"></i></button>
     </td>
   </tr>`;
 }
@@ -534,14 +576,15 @@ function startCoEdit(id) { coEditingId = id; renderCompanies(); setTimeout(() =>
 function cancelCoEdit() { coEditingId = null; renderCompanies(); }
 
 async function saveCoEdit(id) {
-  const name = document.getElementById('co-edit-name').value.trim();
-  const slug = document.getElementById('co-edit-slug').value.trim();
+  const name   = document.getElementById('co-edit-name').value.trim();
+  const slug   = document.getElementById('co-edit-slug').value.trim();
   const active = document.getElementById('co-edit-active').checked ? 1 : 0;
+  const notes  = document.getElementById('co-edit-notes').value.trim();
   if (!name || !slug) { toast('Name and slug required.', 'error'); return; }
   try {
     const d = await fetch(`/api/companies/${id}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, slug, active}),
+      body: JSON.stringify({name, slug, active, notes}),
     }).then(r => r.json());
     if (d.error) { toast(d.error, 'error'); return; }
     coEditingId = null;
@@ -550,9 +593,14 @@ async function saveCoEdit(id) {
   } catch (e) { toast('Save failed.', 'error'); }
 }
 
+async function archiveCompany(id) {
+  await fetch(`/api/companies/${id}/archive`, {method: 'POST'});
+  await loadCompanies();
+}
+
 async function deleteCompany(id) {
   const c = companies.find(x => x.id === id);
-  if (!confirm(`Delete "${c ? c.name : id}"?`)) return;
+  if (!confirm(`Delete "${c ? c.name : id}"? This cannot be undone.`)) return;
   await fetch(`/api/companies/${id}`, {method: 'DELETE'});
   await loadCompanies();
   toast('Deleted.');
@@ -562,13 +610,14 @@ function showAddCompanyRow() { coAddRowVisible = true; coEditingId = null; rende
 function hideAddCompanyRow() { coAddRowVisible = false; renderCompanies(); }
 
 async function submitAddCompany() {
-  const name = document.getElementById('add-co-name').value.trim();
-  const slug = document.getElementById('add-co-slug').value.trim();
+  const name  = document.getElementById('add-co-name').value.trim();
+  const slug  = document.getElementById('add-co-slug').value.trim();
+  const notes = document.getElementById('add-co-notes').value.trim();
   if (!name || !slug) { toast('Name and slug required.', 'error'); return; }
   try {
     const d = await fetch('/api/companies', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, slug}),
+      body: JSON.stringify({name, slug, notes}),
     }).then(r => r.json());
     if (d.error) { toast(d.error, 'error'); return; }
     coAddRowVisible = false;
@@ -587,7 +636,7 @@ async function loadPeople() {
     document.getElementById('people-count').textContent = people.length;
   } catch (e) {
     document.getElementById('people-tbody').innerHTML =
-      `<tr><td colspan="9" class="text-danger text-center py-3">Failed to load.</td></tr>`;
+      `<tr><td colspan="10" class="text-danger text-center py-3">Failed to load.</td></tr>`;
   }
 }
 
@@ -605,7 +654,7 @@ function renderPeople() {
 
   let rows = filtered.length
     ? filtered.map(p => buildPersonRow(p)).join('')
-    : `<tr><td colspan="9" class="text-center text-muted py-3">No people tracked yet. Click "Add Person" to start.</td></tr>`;
+    : `<tr><td colspan="10" class="text-center text-muted py-3">No people tracked yet. Click "Add Person" to start.</td></tr>`;
 
   if (pplAddRowVisible) rows += buildAddPersonRow();
   document.getElementById('people-tbody').innerHTML = rows;
@@ -616,27 +665,31 @@ function buildPersonRow(p) {
   const dim = p.active ? '' : 'text-muted';
   const activeIcon = p.active
     ? `<i class="bi bi-check-circle-fill text-success"></i>`
-    : `<i class="bi bi-x-circle-fill text-secondary"></i>`;
+    : `<i class="bi bi-archive-fill text-secondary" title="Archived"></i>`;
   const actLink = p.last_activity_url
     ? `<a href="${escHtml(p.last_activity_url)}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>`
     : `<span class="text-muted">—</span>`;
   const checked = p.last_checked ? p.last_checked.substring(0, 16) : '—';
-  const coName = p.company_name || '<span class="text-muted">—</span>';
   const profileShort = p.profile_url.replace('https://www.linkedin.com', '');
+  const archiveBtn = p.active
+    ? `<button class="btn btn-sm btn-outline-secondary btn-icon ms-1" onclick="archivePerson(${p.id})" title="Archive"><i class="bi bi-archive"></i></button>`
+    : `<button class="btn btn-sm btn-outline-success btn-icon ms-1" onclick="archivePerson(${p.id})" title="Unarchive"><i class="bi bi-arrow-counterclockwise"></i></button>`;
 
   return `
   <tr class="${dim}">
     <td class="ps-3">${escHtml(p.name)}</td>
     <td><a href="${escHtml(p.profile_url)}" target="_blank" class="text-decoration-none" style="font-size:.82rem"><code>${escHtml(profileShort)}</code></a></td>
-    <td style="font-size:.83rem">${escHtml(p.company_name || '')||'<span class="text-muted">—</span>'}</td>
+    <td style="font-size:.83rem">${escHtml(p.company_name || '') || '<span class="text-muted">—</span>'}</td>
     <td class="text-center">${activeIcon}</td>
     <td>${atypeBadge(p.last_activity_type)}</td>
     <td>${timeCell(p.last_activity_time)}</td>
     <td class="text-center">${actLink}</td>
     <td style="font-size:.8rem">${checked}</td>
+    <td>${notesCell(p.notes)}</td>
     <td class="text-end pe-3">
-      <button class="btn btn-sm btn-outline-primary btn-icon" onclick="startPplEdit(${p.id})"><i class="bi bi-pencil"></i></button>
-      <button class="btn btn-sm btn-outline-danger btn-icon ms-1" onclick="deletePerson(${p.id})"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-sm btn-outline-primary btn-icon" onclick="startPplEdit(${p.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+      ${archiveBtn}
+      <button class="btn btn-sm btn-outline-danger btn-icon ms-1" onclick="deletePerson(${p.id})" title="Delete"><i class="bi bi-trash"></i></button>
     </td>
   </tr>`;
 }
@@ -648,7 +701,7 @@ function buildPersonEditRow(p) {
   return `
   <tr class="editing">
     <td class="ps-3"><input class="form-control edit-input" id="ppl-edit-name" value="${escHtml(p.name)}"></td>
-    <td><input class="form-control edit-input" id="ppl-edit-url" value="${escHtml(p.profile_url)}" style="width:220px"></td>
+    <td><input class="form-control edit-input" id="ppl-edit-url" value="${escHtml(p.profile_url)}" style="width:200px"></td>
     <td>
       <select class="form-select edit-input" id="ppl-edit-company" style="font-size:.82rem">
         <option value="">— None —</option>
@@ -659,9 +712,12 @@ function buildPersonEditRow(p) {
       <input type="checkbox" class="form-check-input" id="ppl-edit-active" ${p.active ? 'checked' : ''}>
     </td>
     <td colspan="4" class="text-muted" style="font-size:.8rem">${p.last_activity_time || '—'}</td>
+    <td><textarea class="form-control" id="ppl-edit-notes" rows="2"
+          style="font-size:.8rem;min-width:140px;resize:vertical"
+          placeholder="Markdown…">${escHtml(p.notes || '')}</textarea></td>
     <td class="text-end pe-3">
-      <button class="btn btn-sm btn-success btn-icon" onclick="savePplEdit(${p.id})"><i class="bi bi-check-lg"></i></button>
-      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="cancelPplEdit()"><i class="bi bi-x-lg"></i></button>
+      <button class="btn btn-sm btn-success btn-icon" onclick="savePplEdit(${p.id})" title="Save"><i class="bi bi-check-lg"></i></button>
+      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="cancelPplEdit()" title="Cancel"><i class="bi bi-x-lg"></i></button>
     </td>
   </tr>`;
 }
@@ -673,7 +729,7 @@ function buildAddPersonRow() {
   return `
   <tr id="add-person-row">
     <td class="ps-3"><input class="form-control" id="add-ppl-name" placeholder="Full name" style="font-size:.88rem;height:30px"></td>
-    <td><input class="form-control" id="add-ppl-url" placeholder="https://linkedin.com/in/..." style="font-size:.82rem;height:30px;width:240px"></td>
+    <td><input class="form-control" id="add-ppl-url" placeholder="https://linkedin.com/in/..." style="font-size:.82rem;height:30px;width:210px"></td>
     <td>
       <select class="form-select" id="add-ppl-company" style="font-size:.82rem;height:30px;padding:2px 6px">
         <option value="">— No company —</option>
@@ -681,10 +737,12 @@ function buildAddPersonRow() {
       </select>
     </td>
     <td colspan="4"></td>
+    <td><textarea class="form-control" id="add-ppl-notes" rows="2"
+          style="font-size:.8rem;min-width:120px;resize:vertical" placeholder="Notes (markdown)…"></textarea></td>
     <td></td>
     <td class="text-end pe-3">
-      <button class="btn btn-sm btn-success btn-icon" onclick="submitAddPerson()"><i class="bi bi-plus-lg"></i></button>
-      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="hideAddPersonRow()"><i class="bi bi-x-lg"></i></button>
+      <button class="btn btn-sm btn-success btn-icon" onclick="submitAddPerson()" title="Add"><i class="bi bi-plus-lg"></i></button>
+      <button class="btn btn-sm btn-secondary btn-icon ms-1" onclick="hideAddPersonRow()" title="Cancel"><i class="bi bi-x-lg"></i></button>
     </td>
   </tr>`;
 }
@@ -693,15 +751,16 @@ function startPplEdit(id) { pplEditingId = id; renderPeople(); setTimeout(() => 
 function cancelPplEdit() { pplEditingId = null; renderPeople(); }
 
 async function savePplEdit(id) {
-  const name = document.getElementById('ppl-edit-name').value.trim();
+  const name        = document.getElementById('ppl-edit-name').value.trim();
   const profile_url = document.getElementById('ppl-edit-url').value.trim();
-  const company_id = document.getElementById('ppl-edit-company').value || null;
-  const active = document.getElementById('ppl-edit-active').checked ? 1 : 0;
+  const company_id  = document.getElementById('ppl-edit-company').value || null;
+  const active      = document.getElementById('ppl-edit-active').checked ? 1 : 0;
+  const notes       = document.getElementById('ppl-edit-notes').value.trim();
   if (!name || !profile_url) { toast('Name and profile URL required.', 'error'); return; }
   try {
     const d = await fetch(`/api/people/${id}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, profile_url, company_id, active}),
+      body: JSON.stringify({name, profile_url, company_id, active, notes}),
     }).then(r => r.json());
     if (d.error) { toast(d.error, 'error'); return; }
     pplEditingId = null;
@@ -710,9 +769,14 @@ async function savePplEdit(id) {
   } catch (e) { toast('Save failed.', 'error'); }
 }
 
+async function archivePerson(id) {
+  await fetch(`/api/people/${id}/archive`, {method: 'POST'});
+  await loadPeople();
+}
+
 async function deletePerson(id) {
   const p = people.find(x => x.id === id);
-  if (!confirm(`Delete "${p ? p.name : id}"?`)) return;
+  if (!confirm(`Delete "${p ? p.name : id}"? This cannot be undone.`)) return;
   await fetch(`/api/people/${id}`, {method: 'DELETE'});
   await loadPeople();
   toast('Deleted.');
@@ -726,14 +790,15 @@ function showAddPersonRow() {
 function hideAddPersonRow() { pplAddRowVisible = false; renderPeople(); }
 
 async function submitAddPerson() {
-  const name = document.getElementById('add-ppl-name').value.trim();
+  const name        = document.getElementById('add-ppl-name').value.trim();
   const profile_url = document.getElementById('add-ppl-url').value.trim();
-  const company_id = document.getElementById('add-ppl-company').value || null;
+  const company_id  = document.getElementById('add-ppl-company').value || null;
+  const notes       = document.getElementById('add-ppl-notes').value.trim();
   if (!name || !profile_url) { toast('Name and profile URL required.', 'error'); return; }
   try {
     const d = await fetch('/api/people', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, profile_url, company_id}),
+      body: JSON.stringify({name, profile_url, company_id, notes}),
     }).then(r => r.json());
     if (d.error) { toast(d.error, 'error'); return; }
     pplAddRowVisible = false;
@@ -828,10 +893,10 @@ async function saveSettings() {
   };
   const liAt = document.getElementById('s-li-at').value.trim();
   const jses = document.getElementById('s-jsessionid').value.trim();
-  const pw = document.getElementById('s-smtp-password').value.trim();
+  const pw   = document.getElementById('s-smtp-password').value.trim();
   if (liAt) payload.linkedin_li_at = liAt;
   if (jses) payload.linkedin_jsessionid = jses;
-  if (pw) payload.smtp_app_password = pw;
+  if (pw)   payload.smtp_app_password = pw;
   try {
     const d = await fetch('/api/settings', {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -867,7 +932,6 @@ document.querySelectorAll('[data-bs-toggle="tab"]').forEach(btn => {
   });
 });
 
-// Escape key closes edit/add rows
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (coEditingId !== null) cancelCoEdit();

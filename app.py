@@ -92,6 +92,10 @@ def add_company():
     slug = (data.get('slug') or '').strip()
     if not name or not slug:
         return jsonify({'error': 'name and slug are required'}), 400
+    existing = database.get_company_by_slug(slug)
+    if existing:
+        state = 'archived' if not existing['active'] else 'active'
+        return jsonify({'error': f'A {state} company with slug "{slug}" already exists.'}), 400
     try:
         database.add_company(name, slug)
         return jsonify({'ok': True})
@@ -105,9 +109,16 @@ def update_company(company_id):
     name = (data.get('name') or '').strip()
     slug = (data.get('slug') or '').strip()
     active = int(data.get('active', 1))
+    notes = (data.get('notes') or '').strip()
     if not name or not slug:
         return jsonify({'error': 'name and slug are required'}), 400
-    database.update_company(company_id, name, slug, active)
+    database.update_company(company_id, name, slug, active, notes)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/companies/<int:company_id>/archive', methods=['POST'])
+def archive_company(company_id):
+    database.toggle_company_active(company_id)
     return jsonify({'ok': True})
 
 
@@ -144,9 +155,12 @@ def add_person():
     if not name or not profile_slug:
         return jsonify({'error': 'name and a valid LinkedIn /in/ URL are required'}), 400
 
-    # Normalise URL to canonical form
-    canonical_url = f"https://www.linkedin.com/in/{profile_slug}/"
+    existing = database.get_person_by_slug(profile_slug)
+    if existing:
+        state = 'archived' if not existing['active'] else 'active'
+        return jsonify({'error': f'An {state} person with that profile URL already exists.'}), 400
 
+    canonical_url = f"https://www.linkedin.com/in/{profile_slug}/"
     try:
         database.add_person(name, profile_slug, canonical_url, company_id)
         return jsonify({'ok': True})
@@ -161,13 +175,20 @@ def update_person(person_id):
     profile_url = (data.get('profile_url') or '').strip()
     company_id = data.get('company_id') or None
     active = int(data.get('active', 1))
+    notes = (data.get('notes') or '').strip()
 
     profile_slug = _slug_from_url(profile_url)
     if not name or not profile_slug:
         return jsonify({'error': 'name and a valid LinkedIn /in/ URL are required'}), 400
 
     canonical_url = f"https://www.linkedin.com/in/{profile_slug}/"
-    database.update_person(person_id, name, profile_slug, canonical_url, company_id, active)
+    database.update_person(person_id, name, profile_slug, canonical_url, company_id, active, notes)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/people/<int:person_id>/archive', methods=['POST'])
+def archive_person(person_id):
+    database.toggle_person_active(person_id)
     return jsonify({'ok': True})
 
 
