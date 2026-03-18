@@ -328,8 +328,8 @@ const PPL_COL_DEFS = [
 let companies = [], people = [];
 let coEditingId = null, pplEditingId = null;
 let coAddRowVisible = false, pplAddRowVisible = false;
-let coSortCol = 'name', coSortDir = 'asc';
-let pplSortCol = 'name', pplSortDir = 'asc';
+let { col: coSortCol,  dir: coSortDir  } = loadSort('co');
+let { col: pplSortCol, dir: pplSortDir } = loadSort('ppl');
 
 function loadColVis(prefix, defs) {
   try {
@@ -343,6 +343,17 @@ function loadColVis(prefix, defs) {
 }
 function saveColVis(prefix, vis) {
   localStorage.setItem(`colvis_${prefix}`, JSON.stringify(vis));
+}
+
+function loadSort(prefix) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`sort_${prefix}`));
+    if (saved && saved.col && saved.dir) return saved;
+  } catch (e) { /* ignore */ }
+  return { col: 'name', dir: 'asc' };
+}
+function saveSort(prefix, col, dir) {
+  localStorage.setItem(`sort_${prefix}`, JSON.stringify({ col, dir }));
 }
 
 let coColVis  = loadColVis('co',  CO_COL_DEFS);
@@ -405,11 +416,11 @@ function updateSortHeaders(prefix, defs, vis, col, dir) {
 
 function sortCo(col) {
   coSortDir = (coSortCol === col && coSortDir === 'asc') ? 'desc' : 'asc';
-  coSortCol = col; renderCompanies();
+  coSortCol = col; saveSort('co', coSortCol, coSortDir); renderCompanies();
 }
 function sortPpl(col) {
   pplSortDir = (pplSortCol === col && pplSortDir === 'asc') ? 'desc' : 'asc';
-  pplSortCol = col; renderPeople();
+  pplSortCol = col; saveSort('ppl', pplSortCol, pplSortDir); renderPeople();
 }
 
 // ─────────────────────────────────────────────
