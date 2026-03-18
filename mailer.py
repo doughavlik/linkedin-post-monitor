@@ -2,7 +2,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
-from db import get_setting
+from db import get_setting, get_last_email_sent_time
 
 ACTIVITY_LABELS = {
     'post': 'Post',
@@ -39,6 +39,12 @@ def send_monitor_email(new_company_activity, checked_companies,
             f"Time: {now_str}"
         )
     elif not new_company_activity and not new_people_activity:
+        last_email_time = get_last_email_sent_time()
+        if last_email_time:
+            last_dt = datetime.strptime(last_email_time, '%Y-%m-%d %H:%M:%S')
+            hours_since = (datetime.now() - last_dt).total_seconds() / 3600
+            if hours_since < 24:
+                return False, None
         body = (
             f"No new activity detected in the last ~30 minutes.\n\n"
             f"Checked {checked_companies} companies"

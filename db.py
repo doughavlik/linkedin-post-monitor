@@ -364,3 +364,13 @@ def get_recent_runs(limit=30):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_last_email_sent_time():
+    """Return the run_time of the most recent run where an email was sent, or None."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT run_time FROM monitor_runs WHERE email_sent=1 ORDER BY run_time DESC LIMIT 1"
+    ).fetchone()
+    conn.close()
+    return row['run_time'] if row else None
